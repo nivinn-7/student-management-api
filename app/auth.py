@@ -7,9 +7,11 @@ from passlib.context import CryptContext
 
 from .schemas import TokenData
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change_this_secret_in_production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be set")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 
 pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
@@ -26,8 +28,14 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     if expires_delta is None:
         expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode = {"sub": subject, "exp": expire}
+    now = datetime.now(timezone.utc)
+    expire = now + expires_delta
+    to_encode = {
+        "sub": subject, 
+        "exp": expire, 
+        "iat": now, 
+        "type": "access"
+    }
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -35,6 +43,10 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 def decode_token(token: str) -> Optional[TokenData]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        if payload.get("type") != "access":
+            return None
+        
         sub: Optional[str] = payload.get("sub")
         exp: Optional[int] = payload.get("exp")
         return TokenData(sub=sub, exp=exp)

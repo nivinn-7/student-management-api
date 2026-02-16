@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Response
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -42,12 +44,35 @@ async def signup_student(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Register number already registered",
         )
-
-    safe_filename = f"{register_number}_{id_card.filename}"
+    
+    ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/jpg"]
+    ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png"]
+    if id_card.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only JPEG and PNG are allowed.",
+        )
+    
+    ext = id_card.filename.split(".")[-1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file extension. Only .jpg, .jpeg and .png are allowed.",
+        )
+    
+    safe_filename = f"{register_number}_{uuid.uuid4().hex}.{ext}"
     file_path = ID_CARDS_DIR / safe_filename
-    with file_path.open("wb") as buffer:
-        content = await id_card.read()
-        buffer.write(content)
+
+    content = await id_card.read()
+
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds the 5MB limit.",
+        )
+
+    with file_path.open("wb") as f:
+        f.write(content)
 
     hashed_password = get_password_hash(password)
 
@@ -67,17 +92,16 @@ async def signup_student(
 
 @router.post("/token", response_model=schemas.Token)
 def login_for_access_token(
-    payload: LoginRequest,
-    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
 
     student = (
         db.query(models.Student)
-        .filter(models.Student.register_number == payload.username)
+        .filter(models.Student.register_number == form_data.username)
         .first()
     )
-    if not student or not verify_password(payload.password, student.hashed_password):
+    if not student or not verify_password(form_data.password, student.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect register number or password",
@@ -86,12 +110,6 @@ def login_for_access_token(
 
     access_token = create_access_token(subject=str(student.id))
 
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        samesite="lax",
-    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 

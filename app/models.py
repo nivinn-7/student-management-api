@@ -1,4 +1,5 @@
-from datetime import date, datetime
+import enum
+from sqlalchemy import Enum
 from sqlalchemy import (
     Column,
     Integer,
@@ -13,6 +14,10 @@ from sqlalchemy.orm import relationship
 
 from .database import Base
 
+class CollegeType(enum.Enum):
+    ENGINEERING = "Engineering"
+    DEGREE = "Degree"
+    OTHERS = "Others"
 
 class College(Base):
     __tablename__ = "colleges"
@@ -22,6 +27,8 @@ class College(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     district = Column(String(255), nullable=True)
+    college_type = Column(Enum(CollegeType), nullable=False)
+    department_count = Column(Integer, nullable=True)
     remarks = Column(String(512), nullable=True)
 
     students = relationship("Student", back_populates="college")
@@ -32,7 +39,8 @@ class Course(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    duration = Column(Integer, nullable=False)  # years
+    duration = Column(Integer, nullable=False)
+    college_type = Column(Enum(CollegeType), nullable=False)
 
     students = relationship("Student", back_populates="course")
 
