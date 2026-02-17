@@ -1,6 +1,7 @@
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from .. import models, schemas
 from ..dependencies import get_db, get_current_student
@@ -33,9 +34,15 @@ def check_in(
     )
 
     db.add(attendance)
-    db.commit()
-    db.refresh(attendance)
-
+    try:
+        db.commit()
+        db.refresh(attendance)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to check in",
+        )
     return attendance
 
 @router.post("/check-out", response_model=schemas.AttendanceRead)
@@ -64,8 +71,15 @@ def check_out(
 
     attendance.check_out_time = datetime.today()
 
-    db.commit()
-    db.refresh(attendance)
-
+    try:
+        db.commit()
+        db.refresh(attendance)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to check out",
+        )
+    
     return attendance
 
