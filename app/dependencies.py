@@ -8,7 +8,7 @@ from .database import SessionLocal
 from . import models
 from .auth import decode_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -55,7 +55,7 @@ def get_current_student(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    student = db.get(models.Student, student_id)
     if student is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

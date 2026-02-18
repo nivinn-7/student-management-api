@@ -1,7 +1,8 @@
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from .models import CollegeType
 
 class CollegeBase(BaseModel):
     name: str
@@ -15,6 +16,7 @@ class CollegeCreate(CollegeBase):
 
 class CollegeRead(CollegeBase):
     id: int
+    college_type: CollegeType
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -38,18 +40,11 @@ class StudentBase(BaseModel):
     college_id: int
     course_id: int
 
-class StudentCreate(StudentBase):
-    password: str
-
 class StudentRead(StudentBase):
     id: int
     id_card_path: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
-
-class StudentLogin(BaseModel):
-    register_number: str
-    password: str
 
 class StudentMe(BaseModel):
     id: int
@@ -70,28 +65,14 @@ class TokenData(BaseModel):
     exp: Optional[int] = None
 
 
-class AttendanceBase(BaseModel):
+class AttendanceRead(BaseModel):
+    id: int
     date: date
     check_in_time: Optional[datetime] = None
     check_out_time: Optional[datetime] = None
-    check_in_lat: Optional[float] = None
-    check_in_lon: Optional[float] = None
-    check_out_lat: Optional[float] = None
-    check_out_lon: Optional[float] = None
-
-class AttendanceRead(AttendanceBase):
-    id: int
-    student_id: int
 
     model_config = ConfigDict(from_attributes=True)
 
-class AttendanceCheckInRequest(BaseModel):
-    latitude: float
-    longitude: float
-
-class AttendanceCheckOutRequest(BaseModel):
-    latitude: float
-    longitude: float
-
-class AttendanceList(BaseModel):
-    items: List[AttendanceRead]
+class AttendanceLocationRequest(BaseModel):
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)

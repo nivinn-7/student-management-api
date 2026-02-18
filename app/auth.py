@@ -10,8 +10,10 @@ from .schemas import TokenData
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set")
-ALGORITHM = "HS256"
+
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+ISSUER = os.getenv("ISSUER", "techy-app")
 
 pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
@@ -30,19 +32,25 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 
     now = datetime.now(timezone.utc)
     expire = now + expires_delta
-    to_encode = {
+
+    payload = {
         "sub": subject, 
         "exp": expire, 
         "iat": now, 
-        "type": "access"
+        "type": "access",
+        "iss": ISSUER
     }
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> Optional[TokenData]:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token,
+            SECRET_KEY, 
+            algorithms = [ALGORITHM], 
+            options = {"require": ["exp", "sub", "type", "iss"]}, 
+            issuer = ISSUER
+        )
 
         if payload.get("type") != "access":
             return None

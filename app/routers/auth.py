@@ -45,6 +45,26 @@ async def signup_student(
             detail="Register number already registered",
         )
     
+    college = db.query(models.College).filter(models.College.id == college_id).first()
+    if not college:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="College not found",
+        )
+    
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course not found",
+        )
+    
+    if course.college_id != college.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Course does not belong to the specified college",
+        )
+
     ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/jpg"]
     ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png"]
     if id_card.content_type not in ALLOWED_CONTENT_TYPES:
@@ -84,10 +104,18 @@ async def signup_student(
         id_card_path=str(file_path),
         hashed_password=hashed_password,
     )
-    db.add(student)
-    db.commit()
-    db.refresh(student)
-    return student
+    try:
+        db.add(student)
+        db.commit()
+        db.refresh(student)
+        return student
+    except Exception:
+        db.rollback()
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Signup failed",
+        )
 
 
 @router.post("/token", response_model=schemas.Token)
