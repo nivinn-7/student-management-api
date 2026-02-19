@@ -80,8 +80,8 @@ async def signup_student(
             detail="Invalid file extension. Only .jpg, .jpeg and .png are allowed.",
         )
     
-    # safe_filename = f"{register_number}_{uuid.uuid4().hex}.{ext}"
-    # file_path = ID_CARDS_DIR / safe_filename
+    safe_filename = f"{register_number}_{uuid.uuid4().hex}.{ext}"
+    file_path = ID_CARDS_DIR / safe_filename
 
     content = await id_card.read()
 
@@ -91,8 +91,8 @@ async def signup_student(
             detail="File size exceeds the 5MB limit.",
         )
 
-    # with file_path.open("wb") as f:
-    #     f.write(content)
+    with file_path.open("wb") as f:
+        f.write(content)
 
     hashed_password = get_password_hash(password)
 
