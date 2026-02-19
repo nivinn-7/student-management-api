@@ -127,3 +127,16 @@ def check_out(
         )
     
     return attendance
+
+@router.get("/my", response_model=list[schemas.AttendanceRead])
+def get_my_attendance(
+    db: Session = Depends(get_db),
+    current_student: models.Student = Depends(get_current_student),
+):
+    records = (
+        db.query(models.Attendance)
+        .filter(models.Attendance.student_id == current_student.id)
+        .order_by(models.Attendance.date.desc())
+        .all()
+    )
+    return records
