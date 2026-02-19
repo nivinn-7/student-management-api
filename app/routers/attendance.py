@@ -140,3 +140,27 @@ def get_my_attendance(
         .all()
     )
     return records
+
+@router.get("/today")
+def get_today_status(
+    db: Session = Depends(get_db),
+    current_student: models.Student = Depends(get_current_student),
+):
+    today = datetime.now(timezone.utc).date()
+
+    attendance = (
+        db.query(models.Attendance)
+        .filter(
+            models.Attendance.student_id == current_student.id,
+            models.Attendance.date == today,
+        )
+        .first()
+    )
+
+    if not attendance:
+        return {"checked_in": False, "checked_out": False}
+
+    return {
+        "checked_in": attendance.check_in_time is not None,
+        "checked_out": attendance.check_out_time is not None,
+    }

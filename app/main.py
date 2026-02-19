@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine
-from .routers import auth as auth_router, attendance as attendance_router
+from .routers import auth as auth_router, attendance as attendance_router, college as college_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,6 +20,7 @@ app.add_middleware(
 
 app.include_router(auth_router.router)
 app.include_router(attendance_router.router)
+app.include_router(college_router.router)
 
 @app.get("/health", tags=["health"])
 def health_check():

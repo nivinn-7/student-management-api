@@ -1,10 +1,9 @@
 import os
 from pathlib import Path
-
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -12,11 +11,6 @@ from ..auth import get_password_hash, verify_password, create_access_token
 from ..dependencies import get_db, get_current_student
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
 
 UPLOAD_ROOT = os.getenv("UPLOAD_ROOT", "uploads")
 ID_CARDS_DIR = Path(UPLOAD_ROOT) / "id_cards"
@@ -26,6 +20,7 @@ ID_CARDS_DIR.mkdir(parents=True, exist_ok=True)
 @router.post("/signup", response_model=schemas.StudentRead, status_code=status.HTTP_201_CREATED)
 async def signup_student(
     name: str = Form(...),
+    email: EmailStr = Form(...),
     register_number: str = Form(...),
     college_id: int = Form(...),
     course_id: int = Form(...),
@@ -33,26 +28,26 @@ async def signup_student(
     id_card: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-
-    existing = (
-        db.query(models.Student)
-        .filter(models.Student.register_number == register_number)
-        .first()
-    )
-    if existing:
+    if db.query(models.Student).filter(models.Student.email == email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+    
+    if db.query(models.Student).filter(models.Student.register_number == register_number).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Register number already registered",
         )
     
-    college = db.query(models.College).filter(models.College.id == college_id).first()
+    college = db.get(models.College, college_id)
     if not college:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="College not found",
         )
     
-    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    course = db.get(models.Course, course_id)
     if not course:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -79,9 +74,6 @@ async def signup_student(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid file extension. Only .jpg, .jpeg and .png are allowed.",
         )
-    
-    safe_filename = f"{register_number}_{uuid.uuid4().hex}.{ext}"
-    file_path = ID_CARDS_DIR / safe_filename
 
     content = await id_card.read()
 
@@ -90,21 +82,26 @@ async def signup_student(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File size exceeds the 5MB limit.",
         )
+    
+    safe_filename = f"{register_number}_{uuid.uuid4().hex}.{ext}"
+    file_path = ID_CARDS_DIR / safe_filename
 
-    with file_path.open("wb") as f:
-        f.write(content)
-
-    hashed_password = get_password_hash(password)
-
-    student = models.Student(
-        name=name,
-        register_number=register_number,
-        college_id=college_id,
-        course_id=course_id,
-        id_card_path=str(file_path),
-        hashed_password=hashed_password,
-    )
     try:
+        with file_path.open("wb") as f:
+            f.write(content)
+
+        hashed_password = get_password_hash(password)
+
+        student = models.Student(
+            name=name,
+            email=email,
+            register_number=register_number,
+            college_id=college_id,
+            course_id=course_id,
+            id_card_path=str(file_path),
+            hashed_password=hashed_password,
+        )
+
         db.add(student)
         db.commit()
         db.refresh(student)
@@ -113,27 +110,25 @@ async def signup_student(
         db.rollback()
         file_path.unlink(missing_ok=True)
         raise HTTPException(
-            status_code=500,
-            detail=str(e),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Signup failed. Please try again.",
         )
 
-
-@router.post("/token", response_model=schemas.Token)
-def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+@router.post("/login", response_model=schemas.Token)
+def login(
+    login_data: schemas.StudentLogin,
     db: Session = Depends(get_db),
 ):
 
     student = (
         db.query(models.Student)
-        .filter(models.Student.register_number == form_data.username)
+        .filter(models.Student.email == login_data.email)
         .first()
     )
-    if not student or not verify_password(form_data.password, student.hashed_password):
+    if not student or not verify_password(login_data.password, student.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect register number or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Incorrect email or password",
         )
 
     access_token = create_access_token(subject=str(student.id))
@@ -146,4 +141,3 @@ def read_current_student(
     current_student: models.Student = Depends(get_current_student),
 ):
     return current_student
-

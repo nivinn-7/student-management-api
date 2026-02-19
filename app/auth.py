@@ -11,7 +11,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set")
 
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_TYPE = "access"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 ISSUER = os.getenv("ISSUER", "techy-app")
 
@@ -37,7 +38,7 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
         "sub": subject, 
         "exp": expire, 
         "iat": now, 
-        "type": "access",
+        "type": ACCESS_TOKEN_TYPE,
         "iss": ISSUER
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -52,7 +53,7 @@ def decode_token(token: str) -> Optional[TokenData]:
             issuer = ISSUER
         )
 
-        if payload.get("type") != "access":
+        if payload.get("type") != ACCESS_TOKEN_TYPE:
             return None
         
         sub: Optional[str] = payload.get("sub")
@@ -60,4 +61,3 @@ def decode_token(token: str) -> Optional[TokenData]:
         return TokenData(sub=sub, exp=exp)
     except JWTError:
         return None
-

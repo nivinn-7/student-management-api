@@ -1,7 +1,7 @@
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from .models import CollegeType
 
 class CollegeBase(BaseModel):
@@ -36,9 +36,13 @@ class CourseRead(CourseBase):
 
 class StudentBase(BaseModel):
     name: str
+    email: EmailStr
     register_number: str
     college_id: int
     course_id: int
+
+class StudentCreate(StudentBase):
+    password: str = Field(..., min_length=6)
 
 class StudentRead(StudentBase):
     id: int
@@ -46,9 +50,14 @@ class StudentRead(StudentBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class StudentLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class StudentMe(BaseModel):
     id: int
     name: str
+    email: EmailStr
     register_number: str
     college: CollegeRead
     course: CourseRead

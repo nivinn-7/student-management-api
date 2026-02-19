@@ -28,7 +28,7 @@ class College(Base):
     longitude = Column(Float, nullable=False)
     district = Column(String(255), nullable=True)
     college_type = Column(Enum(CollegeType, name = "collegetype"), nullable=False)
-    department_count = Column(Integer, nullable=True)
+    department_count = Column(Integer, nullable=False, default=0)
     remarks = Column(String(512), nullable=True)
 
     students = relationship("Student", back_populates="college")
@@ -51,6 +51,7 @@ class Student(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
     register_number = Column(String(100), unique=True, index=True, nullable=False)
     college_id = Column(Integer, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
     course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
