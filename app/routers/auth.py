@@ -3,6 +3,7 @@ from pathlib import Path
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
@@ -116,16 +117,16 @@ async def signup_student(
 
 @router.post("/login", response_model=schemas.Token)
 def login(
-    login_data: schemas.StudentLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
 
     student = (
         db.query(models.Student)
-        .filter(models.Student.email == login_data.email)
+        .filter(models.Student.email == form_data.username)
         .first()
     )
-    if not student or not verify_password(login_data.password, student.hashed_password):
+    if not student or not verify_password(form_data.password, student.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
